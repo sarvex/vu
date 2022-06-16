@@ -1,22 +1,22 @@
-// Copyright © 2013-2018 Galvanized Logic Inc.
+// Copyright © 2013-2022 Galvanized Logic Inc.
 // Use is governed by a BSD-style license found in the LICENSE file.
 
 // Design Notes:
 // Big thanks to GLFW (http://www.glfw.org) from which the minimalist API
 // philosophy was borrowed along with which OS specific API's mattered.
 // Also thank you to https://github.com/golang/mobile.
-// FUTURE: Linux support  : ignore X support and wait for Wayland.
-//                          Need to pick one distro for main testing.
+// FUTURE: Linux support  : Wayland only, ignore X support.
+//                          Use Ubuntu as this is what is expected by Steam.
 // FUTURE: Android support: need access to android hardware.
+// FUTURE: Apple support  : macos, ios, etc. currently control the game timing
+//                          loop by calling back the app when the display needs
+//                          a refresh. Wait until a game loop with full timing
+//                          control before attempting apple support.
 
-// Package device provides minimal platform/os access to a 3D rendering context
-// and user input. Access to user keyboard and mouse or touch input is provided
+// Package device provides minimal platform/os access to a render display and
+// user input. Access to user keyboard and mouse or touch input is provided
 // through the Pressed structure. The application is responsible for providing
-// windowing constructs like buttons, dialogs, sub-panels, text-boxes, etc.
-//
-// An application is expected to create a device and then call Run.
-// Running a device takes control of the processing, calling the application
-// back on the App interface methods.
+// the windowing constructs like buttons, dialogs, sub-panels, text-boxes, etc.
 //
 // Package device is provided as part of the vu (virtual universe) 3D engine.
 package device
@@ -37,10 +37,13 @@ package device
 // or app, stopping calls to Refresh. Calls to Refresh may also stop when
 // the application loses focus or is put in the background.
 type Device interface {
+	Init()    // Initialize device and allocate OS resources.
+	Dispose() // Stop device and release OS specific resources.
 
 	// Call Down each App.Refresh to process user input.
 	Down() *Pressed // Gets pressed keys since last call.
-	Dispose()       // Stop device and release OS specific resources.
+
+	ProcessInput() bool
 
 	// Returns the size and position of the screen. Mobile devices
 	// are always full screen where x=y=0.
@@ -53,10 +56,6 @@ type Device interface {
 	// Call after each Refresh.
 	SwapBuffers() // A frame has been rendered.
 
-	// Copy/Paste interacts with the system clipboard using strings.
-	Copy() string   // Returns nil if no string on clipboard.
-	Paste(s string) // Paste the given string onto the clipboard.
-
 	// Windowed computer API's.
 	// The x,y (0,0) coordinates are at the bottom left.
 	// The w,h are width, height dimensions in pixels.
@@ -68,24 +67,24 @@ type Device interface {
 	SetCursorAt(x, y int)   // Places the cursor at the given window location.
 }
 
-// Run initializes the device specific layer and starts callbacks
-// to the given application. This function does not return.
-func Run(app App) {
-	// runApp and a Device implementation is defined
-	// in each native layer.
-	runApp(app) // Does not return!!!
-}
+// // Run initializes the device specific layer and starts callbacks
+// // to the given application. This function does not return.
+// func Run(app App) {
+// 	// runApp and a Device implementation is defined
+// 	// in each native layer.
+// 	runApp(app) // Does not return!!!
+// }
 
-// App handled device callbacks. An App instance is provided to
-// the device.Run method.
-type App interface {
-	Init(dev Device) // Called once after device initialization.
-
-	// Refresh the display. Called at the display refresh rate which is
-	// usually 60 times/second. The current (key/mouse) pressed state is
-	// returned for read only access.
-	Refresh(dev Device) // Called repeatedly after Init.
-}
+// // App handled device callbacks. An App instance is provided to
+// // the device.Run method.
+// type App interface {
+// 	Init(dev Device) // Called once after device initialization.
+//
+// 	// Refresh the display. Called at the display refresh rate which is
+// 	// usually 60 times/second. The current (key/mouse) pressed state is
+// 	// returned for read only access.
+// 	Refresh(dev Device) // Called repeatedly after Init.
+// }
 
 // Pressed is used to communicate user input. Input mainly consists
 // of the keys that are currently pressed and how long they have been

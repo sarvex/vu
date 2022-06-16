@@ -1,12 +1,10 @@
-// Copyright © 2013-2018 Galvanized Logic Inc.
+// Copyright © 2013-2022 Galvanized Logic Inc.
 // Use is governed by a BSD-style license found in the LICENSE file.
 
 package device
 
-// Design Notes:
-// Events are collected until polled by getPressed.
-// The original intent was to collect and process the OS event queues
-// concurrently  but, OSX only allows event processng from the main thread.
+// Design Notes: collect user input events to create a map as to what
+// is currently pressed and how long it has been pressed.
 
 // input is used to process a user event stream into the Pressed structure
 // that is returned to the master application each update.

@@ -1,4 +1,4 @@
-// Copyright © 2013-2018 Galvanized Logic Inc.
+// Copyright © 2013-2022 Galvanized Logic Inc.
 // Use is governed by a BSD-style license found in the LICENSE file.
 
 package device
@@ -9,7 +9,7 @@ package device
 // // C code and cgo directvies.
 //
 // #cgo windows CFLAGS: -m64
-// #cgo windows,!dx LDFLAGS: -lopengl32 -lgdi32
+// #cgo windows,!dx LDFLAGS: -lgdi32
 // #cgo windows,dx LDFLAGS: -ld3d11
 // #cgo windows,dx CXXFLAGS: -std=c++11
 //
@@ -18,42 +18,14 @@ import "C" // must be located here.
 
 import (
 	"runtime"
-	"time"
 	"unsafe"
 )
 
 // OpenGL related, see: https://code.google.com/p/go-wiki/wiki/LockOSThread
 func init() { runtime.LockOSThread() }
 
-// Device instance needed to handle callbacks on exported methods.
-var dev = &win{}
-
-// runApp is the per-device entry method. Compiling will find the one
-// that matches the requested or current platform.
-func runApp(app App) {
-	dev.app = app // The app receiving device callbacks.
-	C.dev_run()   // does not return!
-}
-
-// prepRender is called from os_windows.c after the underlying window
-// has been created and before the update render callbacks start.
-//
-//export prepRender
-func prepRender() {
-	dev.input = newInput()
-	dev.app.Init(dev)
-}
-
-// renderFrame is the called from os_Windows.c as soon as the previous
-// frame has been rendered. Actual frame rate is still limited by the
-// monitor.
-//
-//export renderFrame
-func renderFrame(mx, my int64) {
-	if dev.input != nil {
-		dev.app.Refresh(dev)
-	}
-}
+// Device display instance needed to handle callbacks on exported methods.
+var Display = &win{input: newInput()}
 
 // handleInput is called from os_windows.c to consolidate user input
 // events into a consumable summary of which keys are current pressed.
@@ -61,10 +33,10 @@ func renderFrame(mx, my int64) {
 //
 //export handleInput
 func handleInput(event, data int64) {
-	if dev.input == nil {
-		return // Ignore input before window is up.
+	if Display.input == nil {
+		return // forgot to init dev.input.
 	}
-	in := dev.input
+	in := Display.input
 	switch event {
 	case C.devUp:
 		in.recordRelease(int(data))
@@ -73,12 +45,14 @@ func handleInput(event, data int64) {
 	case C.devScroll:
 		in.curr.Scroll = int(data)
 	case C.devResize:
-		in.curr.Resized = true
-
 		// release all down keys on resize
 		// to avoid missing key release events.
 		in.releaseAll()
+		in.curr.Resized = true
 	case C.devFocusIn, C.devFocusOut:
+		// clear all down keys since key presses
+		// will have been missed when focus was lost.
+		in.releaseAll()
 		in.curr.Focus = event == C.devFocusIn
 	}
 }
@@ -90,45 +64,35 @@ func handleInput(event, data int64) {
 // win is the macOS implementation of the Device interface.
 // See the Device interface for method descriptions.
 type win struct {
-	app      App       // update/render callback.
-	input    *input    // tracks current keys pressed.
-	lastSwap time.Time // helps throttle very fast apps.
+	input *input // tracks current keys pressed.
 }
 
 // Implement the Device interface. See docs in device.go
 // Mostly call the underlying native layer.
+func (os *win) Init()              { C.display_init() }
+func (os *win) Dispose()           { C.display_dispose() }
+func (os *win) ProcessInput() bool { return C.display_process_input() != 0 }
 func (os *win) Down() *Pressed     { return os.input.getPressed(os.Cursor()) }
-func (os *win) Dispose()           { C.dev_dispose() }
-func (os *win) ToggleFullScreen()  { C.dev_toggle_fullscreen() }
-func (os *win) IsFullScreen() bool { return uint(C.dev_fullscreen()) == 1 }
+func (os *win) ToggleFullScreen()  { C.display_toggle_fullscreen() }
+func (os *win) IsFullScreen() bool { return uint(C.display_fullscreen()) == 1 }
 func (os *win) SwapBuffers() {
-	elapsed := time.Since(os.lastSwap)
-	os.lastSwap = time.Now()
-	C.dev_swap()
-
-	// Throttle unreasonable refresh rates since most monitors only
-	// refresh at 60 or 120 times a second. Generally an update is
-	// every 20ms, so start throttling if the app is twice that.
-	// Use a smaller sleep time since sleep is not exact.
-	if elapsed/time.Millisecond < 10 {
-		time.Sleep(5 * time.Millisecond)
-	}
+	C.display_swap()
 }
 func (os *win) SetCursorAt(x, y int) {
-	C.dev_set_cursor_location(C.long(x), C.long(y))
+	C.display_set_cursor_location(C.long(x), C.long(y))
 }
 func (os *win) Cursor() (x, y int) {
 	var mx, my int32
-	C.dev_cursor((*C.long)(&mx), (*C.long)(&my))
+	C.display_cursor((*C.long)(&mx), (*C.long)(&my))
 	return int(mx), int(my)
 }
 func (os *win) Size() (x, y, w, h int) {
 	var winx, winy, width, height int32
-	C.dev_size((*C.long)(&winx), (*C.long)(&winy), (*C.long)(&width), (*C.long)(&height))
+	C.display_size((*C.long)(&winx), (*C.long)(&winy), (*C.long)(&width), (*C.long)(&height))
 	return int(winx), int(winy), int(width), int(height)
 }
 func (os *win) SetSize(x, y, w, h int) {
-	C.dev_set_size(C.long(x), C.long(y), C.long(w), C.long(h))
+	C.display_set_size(C.long(x), C.long(y), C.long(w), C.long(h))
 
 	// resising doesn't trigger an OS resize event so inform
 	// the application directly.
@@ -137,27 +101,14 @@ func (os *win) SetSize(x, y, w, h int) {
 func (os *win) SetTitle(title string) {
 	cstr := C.CString(title)
 	defer C.free(unsafe.Pointer(cstr))
-	C.dev_set_title(cstr)
+	C.display_set_title(cstr)
 }
 func (os *win) ShowCursor(show bool) {
 	trueFalse := 0 // trueFalse needs to be 0 or 1.
 	if show {
 		trueFalse = 1
 	}
-	C.dev_show_cursor(C.uchar(trueFalse))
-}
-func (os *win) Copy() string {
-	if cstr := C.dev_clip_copy(); cstr != nil {
-		str := C.GoString(cstr)      // make a Go copy.
-		C.free(unsafe.Pointer(cstr)) // free the C copy.
-		return str
-	}
-	return ""
-}
-func (os *win) Paste(s string) {
-	cstr := C.CString(s)
-	defer C.free(unsafe.Pointer(cstr))
-	C.dev_clip_paste(cstr)
+	C.display_show_cursor(C.uchar(trueFalse))
 }
 
 // winOS Device implementation.
