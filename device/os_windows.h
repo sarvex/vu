@@ -25,10 +25,6 @@ long display_process_input();
 void display_set_size(long x, long y, long w, long h);
 void display_set_title(char * label);
 
-// Flip the front and back rendering buffers. This is expected to be called
-// each pass through the event loop to display the most recent drawing.
-void display_swap();
-
 // Used to check if the application is full screen mode.
 // Return 1 if the application is full screen, 0 otherwise.
 unsigned char display_fullscreen();

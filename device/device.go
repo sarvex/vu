@@ -15,7 +15,7 @@
 
 // Package device provides minimal platform/os access to a render display and
 // user input. Access to user keyboard and mouse or touch input is provided
-// through the Pressed structure. The application is responsible for providing
+// through the Input structure. The application is responsible for providing
 // the windowing constructs like buttons, dialogs, sub-panels, text-boxes, etc.
 //
 // Package device is provided as part of the vu (virtual universe) 3D engine.
@@ -23,40 +23,24 @@ package device
 
 // Device wraps OS specific functionality. The expected usage is for
 // the application to create the device as follows:
-//     app := &Application{}  // client specific application.
-//     dev := device.Run(app) // create device and render context.
-// where device.Run does not return but calls the following methods:
-//     func (a *Application) Init(dev device.Device) {
-//         // one time call.
-//     }
-//     func (a *Application) Refresh(d device.Device) {
-//         // regular call to handle user input,
-//         // update state, and render a frame.
-//     }
+//    device.Display.Init()
+// and then loop collecting and processing user input:
+//    input, active := device.Display.GetInput()
 // Commonly applications are closed when the user closes the device window
-// or app, stopping calls to Refresh. Calls to Refresh may also stop when
-// the application loses focus or is put in the background.
+// or app. This results in GetInput returning a nil input and active == false. 
 type Device interface {
 	Init()    // Initialize device and allocate OS resources.
 	Dispose() // Stop device and release OS specific resources.
 
-	// Call Down each App.Refresh to process user input.
-	Down() *Pressed // Gets pressed keys since last call.
-
-	ProcessInput() bool
+	// Fetches the latest user input. Expected to be called often.
+	// Returns true is the display is still active.
+	GetInput() (*Input, bool) // user input since last call.
 
 	// Returns the size and position of the screen. Mobile devices
 	// are always full screen where x=y=0.
 	Size() (x, y, w, h int) // in pixels where 0,0 is bottom left.
 
-	// The following methods are for to PC devices and
-	// are currently ignored or unnecessary for mobile.
-
-	// SwapBuffers exchanges the graphic drawing buffers.
-	// Call after each Refresh.
-	SwapBuffers() // A frame has been rendered.
-
-	// Windowed computer API's.
+	// Windowed (PC) computer API's.
 	// The x,y (0,0) coordinates are at the bottom left.
 	// The w,h are width, height dimensions in pixels.
 	SetSize(x, y, w, h int) // Used to restore from preferences.
@@ -67,31 +51,12 @@ type Device interface {
 	SetCursorAt(x, y int)   // Places the cursor at the given window location.
 }
 
-// // Run initializes the device specific layer and starts callbacks
-// // to the given application. This function does not return.
-// func Run(app App) {
-// 	// runApp and a Device implementation is defined
-// 	// in each native layer.
-// 	runApp(app) // Does not return!!!
-// }
-
-// // App handled device callbacks. An App instance is provided to
-// // the device.Run method.
-// type App interface {
-// 	Init(dev Device) // Called once after device initialization.
-//
-// 	// Refresh the display. Called at the display refresh rate which is
-// 	// usually 60 times/second. The current (key/mouse) pressed state is
-// 	// returned for read only access.
-// 	Refresh(dev Device) // Called repeatedly after Init.
-// }
-
-// Pressed is used to communicate user input. Input mainly consists
-// of the keys that are currently pressed and how long they have been
+// Input is used to communicate user input. Input is mostly the keys that
+// are currently pressed and how long they have been
 // pressed (measured in update ticks).
-type Pressed struct {
+type Input struct {
 	Mx, My  int  // Current mouse location.
-	Scroll  int  // The amount of scrolling, if any.
+	Scroll  int32  // The amount of scrolling, if any.
 	Focus   bool // True if window has focus.
 	Resized bool // True if window was resized or moved.
 
@@ -105,7 +70,7 @@ type Pressed struct {
 
 // KeyReleased is used to indicate a key up event has occurred.
 // The total duration of a key press can be calculated by the difference
-// of Pressed.Down duration with KEY_RELEASED. A user would have to hold
+// of Input.Down duration with KEY_RELEASED. A user would have to hold
 // a key down for 24 hours before the released duration became positive
 // (assuming a reasonable update time of 0.02 seconds).
 const KeyReleased = -1000000000

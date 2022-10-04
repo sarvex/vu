@@ -6,27 +6,27 @@ package device
 // Design Notes: collect user input events to create a map as to what
 // is currently pressed and how long it has been pressed.
 
-// input is used to process a user event stream into the Pressed structure
+// input is used to process a user event stream into the Input structure
 // that is returned to the master application each update.
 type input struct {
-	curr  *Pressed    // Consolidates current user events into state.
-	down  *Pressed    // Clone of curr that is shared with the application.
+	curr  *Input      // Consolidates current user events into state.
+	down  *Input      // Clone of curr that is shared with the application.
 	queue map[int]int // queue very quick press/release.
 }
 
 // newInput creates the memory needed to process user input events.
 func newInput() *input {
 	i := &input{}
-	i.curr = &Pressed{Focus: true, Down: map[int]int{}}
-	i.down = &Pressed{Focus: true, Down: map[int]int{}}
+	i.curr = &Input{Focus: true, Down: map[int]int{}}
+	i.down = &Input{Focus: true, Down: map[int]int{}}
 	i.queue = map[int]int{}
 	return i
 }
 
-// getPressed returns the current user input state of buttons pressed
+// getInput returns the current user input state of buttons pressed
 // and keys clicked. It expects to be called each update thread tick.
 // Old released keys are removed for the next call.
-func (i *input) getPressed(mx, my int) *Pressed {
+func (i *input) getInput(mx, my int) *Input {
 	i.curr.Mx = mx          // update Current mouse location.
 	i.curr.My = my          //   "
 	i.updateDurations()     // Keep track of key press duration.
@@ -81,8 +81,8 @@ func (i *input) releaseAll() {
 
 // clone the current user input information into the structure that is
 // shared with the outside process. Remove any released keys from the map.
-// This method is expected to be called by getPressed().
-func (i *input) clone(in, out *Pressed) {
+// This method is expected to be called by getInput().
+func (i *input) clone(in, out *Input) {
 	for key := range out.Down {
 		delete(out.Down, key)
 	}
@@ -91,7 +91,7 @@ func (i *input) clone(in, out *Pressed) {
 	}
 	out.Mx, out.My = in.Mx, in.My
 	out.Focus = in.Focus
-	out.Resized = in.Resized
+out.Resized = in.Resized
 	out.Scroll = in.Scroll
 	in.Scroll = 0      // remove previous scroll info.
 	in.Resized = false // remove previous resized trigger.
@@ -99,7 +99,7 @@ func (i *input) clone(in, out *Pressed) {
 
 // clearReleases removes released key once the information has
 // been polled by the application.
-func (i *input) clearReleases(in *Pressed) {
+func (i *input) clearReleases(in *Input) {
 	for key, val := range in.Down {
 		if val < 0 {
 			delete(in.Down, key) // remove released keys.

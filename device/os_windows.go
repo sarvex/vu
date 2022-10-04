@@ -43,7 +43,7 @@ func handleInput(event, data int64) {
 	case C.devDown:
 		in.recordPress(int(data))
 	case C.devScroll:
-		in.curr.Scroll = int(data)
+		in.curr.Scroll = int32(data)
 	case C.devResize:
 		// release all down keys on resize
 		// to avoid missing key release events.
@@ -69,15 +69,16 @@ type win struct {
 
 // Implement the Device interface. See docs in device.go
 // Mostly call the underlying native layer.
-func (os *win) Init()              { C.display_init() }
-func (os *win) Dispose()           { C.display_dispose() }
-func (os *win) ProcessInput() bool { return C.display_process_input() != 0 }
-func (os *win) Down() *Pressed     { return os.input.getPressed(os.Cursor()) }
+func (os *win) Init()    { C.display_init() }
+func (os *win) Dispose() { C.display_dispose() }
+func (os *win) GetInput() (*Input, bool) {
+	if C.display_process_input() == 0 {
+		return nil, false
+	}
+	return os.input.getInput(os.Cursor()), true
+}
 func (os *win) ToggleFullScreen()  { C.display_toggle_fullscreen() }
 func (os *win) IsFullScreen() bool { return uint(C.display_fullscreen()) == 1 }
-func (os *win) SwapBuffers() {
-	C.display_swap()
-}
 func (os *win) SetCursorAt(x, y int) {
 	C.display_set_cursor_location(C.long(x), C.long(y))
 }

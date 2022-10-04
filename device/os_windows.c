@@ -117,9 +117,8 @@ LRESULT CALLBACK gs_wnd_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         }
         case WM_MOUSEWHEEL:
         {
-            // flip scroll direction to match OSX.
-            long scroll = -1 * (((int)wParam) >> 16) / WHEEL_DELTA;
-            handleInput(devScroll, scroll);
+            long delta = GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA;
+            handleInput(devScroll, delta);
             return 0;
         }
         case WM_SIZE:
@@ -245,12 +244,6 @@ long display_process_input()
         return displayClosed;
     }
     return displayActive;
-}
-
-// Swaps rendering buffer. Called after rendering a frame.
-void display_swap()
-{
-    SwapBuffers(shell);
 }
 
 // Used to check if the application is full screen mode.

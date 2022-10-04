@@ -5,7 +5,7 @@
 //
 // Ignored because cgo attempts to compile it during normal builds.
 // To build a native test application, compile this using:
-//     gcc -o winapp os_windows.c os_windows_test.c -lgdi32 -Wall -m64
+//     gcc -o sh os_windows.c os_windows_test.c -lgdi32 -Wall -m64
 
 #include <stdio.h>
 #include "os_windows.h"
@@ -75,7 +75,7 @@ void handleInput(long event, long data)
     } 
     else if (event == devScroll) 
     {
-        printf("scroll %#lx\n", data);
+        printf("scroll %ld\n", data);
     } 
     else if (event == devResize)  
     {
